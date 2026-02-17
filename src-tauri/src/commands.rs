@@ -1,0 +1,65 @@
+use chrono::Utc;
+use tauri::State;
+
+use crate::database::Database;
+use crate::file_manager::{self, Note};
+
+/// Creates a new note with the given title
+#[tauri::command]
+pub fn create_note(title: String, db: State<'_, Database>) -> Result<Note, String> {
+    let note = file_manager::create_note(&title).map_err(|e| e.to_string())?;
+    db.add_note_metadata(&note).map_err(|e| e.to_string())?;
+    Ok(note)
+}
+
+/// Returns all notes (metadata only)
+#[tauri::command]
+pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<Note>, String> {
+    db.get_notes_metadata().map_err(|e| e.to_string())
+}
+
+/// Returns the body content of a specific note
+#[tauri::command]
+pub fn get_note_content(id: String) -> Result<String, String> {
+    file_manager::get_note_content(&id).map_err(|e| e.to_string())
+}
+
+/// Saves updated content for an existing note
+#[tauri::command]
+pub fn save_note(id: String, content: String, db: State<'_, Database>) -> Result<(), String> {
+    file_manager::save_note(&id, &content).map_err(|e| e.to_string())?;
+
+    // Update modified_at in database
+    let now = Utc::now().timestamp();
+    let notes = db.get_notes_metadata().map_err(|e| e.to_string())?;
+    if let Some(mut note) = notes.into_iter().find(|n| n.id == id) {
+        note.modified_at = now;
+        db.update_note_metadata(&note).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Deletes a note by its ID (file + database entry)
+#[tauri::command]
+pub fn delete_note(id: String, db: State<'_, Database>) -> Result<(), String> {
+    file_manager::delete_note(&id).map_err(|e| e.to_string())?;
+    db.delete_note_metadata(&id).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Renames a note (updates frontmatter + database)
+#[tauri::command]
+pub fn rename_note(id: String, new_title: String, db: State<'_, Database>) -> Result<(), String> {
+    file_manager::rename_note(&id, &new_title).map_err(|e| e.to_string())?;
+
+    let now = Utc::now().timestamp();
+    let notes = db.get_notes_metadata().map_err(|e| e.to_string())?;
+    if let Some(mut note) = notes.into_iter().find(|n| n.id == id) {
+        note.title = new_title;
+        note.modified_at = now;
+        db.update_note_metadata(&note).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
