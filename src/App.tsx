@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNotes } from './hooks/useNotes';
 import Editor from './components/Editor';
+import NoteHeader from './components/NoteHeader';
 import NoteList from './components/NoteList';
 import CommandPalette from './components/CommandPalette';
 import ToastContainer, { showToast } from './components/Toast';
@@ -67,6 +68,23 @@ export default function App() {
     showToast('Note renamed', 'success');
   }, [renameNote]);
 
+  const handleTitleChange = useCallback(async (title: string) => {
+    if (activeNoteId) {
+      await renameNote(activeNoteId, title);
+    }
+  }, [activeNoteId, renameNote]);
+
+  // Focus editor body (called from NoteHeader on Enter)
+  const focusEditor = useCallback(() => {
+    const editorEl = document.querySelector('.editor-content') as HTMLElement;
+    if (editorEl) editorEl.focus();
+  }, []);
+
+  // Get word/char counts from editor storage
+  const editorEl = document.querySelector('.ProseMirror');
+  const wordCount = editorEl ? (editorEl as HTMLElement).textContent?.split(/\s+/).filter(Boolean).length ?? 0 : 0;
+  const charCount = editorEl ? (editorEl as HTMLElement).textContent?.length ?? 0 : 0;
+
   return (
     <div className="app-layout">
       <NoteList
@@ -83,16 +101,25 @@ export default function App() {
 
       <main className="main-area">
         {activeNote && (
-          <div className="note-header">
-            <h2 className="note-title">{activeNote.title}</h2>
-          </div>
+          <NoteHeader
+            noteId={activeNoteId}
+            title={activeNote.title}
+            createdAt={activeNote.created_at}
+            modifiedAt={activeNote.modified_at}
+            wordCount={wordCount}
+            charCount={charCount}
+            onTitleChange={handleTitleChange}
+            onEditorFocus={focusEditor}
+          />
         )}
         <Editor
           noteId={activeNoteId}
+          noteTitle={activeNote?.title ?? 'Untitled'}
           content={activeContent}
           saving={saving}
           onSave={saveNote}
           onContentChange={setActiveContent}
+          onTitleChange={handleTitleChange}
         />
       </main>
 

@@ -35,9 +35,19 @@ impl Database {
                 file_path TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 modified_at INTEGER NOT NULL
-            );",
+            );
+
+            CREATE TABLE IF NOT EXISTS note_versions (
+                id TEXT PRIMARY KEY,
+                note_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_versions_note_id ON note_versions(note_id, created_at DESC);",
         )
-        .context("Failed to create notes table")?;
+        .context("Failed to create tables")?;
 
         Ok(Database {
             conn: Mutex::new(conn),
@@ -103,4 +113,66 @@ impl Database {
             .context("Failed to delete note metadata")?;
         Ok(())
     }
+
+    /// Saves a content snapshot as a new version for a note
+    pub fn save_version(&self, note_id: &str, content: &str) -> Result<String> {
+        let conn = self.conn.lock().expect("Database mutex poisoned");
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO note_versions (id, note_id, content, created_at) VALUES (?1, ?2, ?3, ?4)",
+            (&id, note_id, content, now),
+        )
+        .context("Failed to save version")?;
+
+        // Keep only the most recent 50 versions per note
+        conn.execute(
+            "DELETE FROM note_versions WHERE note_id = ?1 AND id NOT IN (
+                SELECT id FROM note_versions WHERE note_id = ?1 ORDER BY created_at DESC LIMIT 50
+            )",
+            [note_id],
+        )
+        .context("Failed to prune old versions")?;
+
+        Ok(id)
+    }
+
+    /// Retrieves all versions for a note, sorted newest first
+    pub fn get_versions(&self, note_id: &str) -> Result<Vec<NoteVersion>> {
+        let conn = self.conn.lock().expect("Database mutex poisoned");
+        let mut stmt = conn
+            .prepare("SELECT id, note_id, content, created_at FROM note_versions WHERE note_id = ?1 ORDER BY created_at DESC")
+            .context("Failed to prepare versions query")?;
+
+        let versions = stmt
+            .query_map([note_id], |row| {
+                Ok(NoteVersion {
+                    id: row.get(0)?,
+                    note_id: row.get(1)?,
+                    content: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
+            })
+            .context("Failed to query versions")?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .context("Failed to collect version rows")?;
+
+        Ok(versions)
+    }
+
+    /// Deletes all versions for a note
+    pub fn delete_versions_for_note(&self, note_id: &str) -> Result<()> {
+        let conn = self.conn.lock().expect("Database mutex poisoned");
+        conn.execute("DELETE FROM note_versions WHERE note_id = ?1", [note_id])
+            .context("Failed to delete versions")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NoteVersion {
+    pub id: String,
+    pub note_id: String,
+    pub content: String,
+    pub created_at: i64,
 }
