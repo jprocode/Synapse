@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 interface FindReplaceProps {
@@ -38,7 +38,7 @@ export default function FindReplace({ editor, isOpen, onClose }: FindReplaceProp
             // Remove highlights
             if (editor) {
                 const existingPlugin = editor.view.state.plugins.find(
-                    (p) => (p.spec as { key?: string }).key === searchPluginKey.spec.key
+                    (p) => String((p as any).key) === String((searchPluginKey as any).key)
                 );
                 if (existingPlugin) {
                     editor.view.dispatch(editor.view.state.tr.setMeta(searchPluginKey, { decorations: DecorationSet.empty }));

@@ -1,14 +1,10 @@
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 
 /**
  * Footnote system for Obsidian-style markdown.
- * 
+ *
  * Inline footnote reference: [^1] renders as a superscript link
  * Footnote definition block: [^1]: footnote text
- * 
- * This creates two node types:
- * - footnoteRef: inline superscript reference
- * - footnoteDefinition: block-level definition
  */
 
 export interface FootnoteRefOptions {
@@ -75,17 +71,16 @@ export const FootnoteRef = Node.create<FootnoteRefOptions>({
 
     addInputRules() {
         return [
-            {
-                // Match [^id] to insert a footnote reference
+            new InputRule({
                 find: /\[\^(\w+)\]$/,
-                handler: ({ state, range, match, chain }: { state: any; range: any; match: RegExpMatchArray; chain: any }) => {
+                handler: ({ range, match, chain }) => {
                     const id = match[1];
                     chain()
                         .deleteRange(range)
                         .insertFootnoteRef(id)
                         .run();
                 },
-            },
+            }),
         ];
     },
 });

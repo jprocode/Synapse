@@ -1,6 +1,4 @@
-import { Node, mergeAttributes } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 
 /**
  * Obsidian-style hidden comment: %%comment text%%
@@ -20,8 +18,6 @@ declare module '@tiptap/core' {
         };
     }
 }
-
-const commentPluginKey = new PluginKey('obsidianComment');
 
 const ObsidianComment = Node.create<ObsidianCommentOptions>({
     name: 'obsidianComment',
@@ -68,16 +64,15 @@ const ObsidianComment = Node.create<ObsidianCommentOptions>({
 
     addInputRules() {
         return [
-            {
-                // Match %% at start of line to create comment block
+            new InputRule({
                 find: /^%%\s$/,
-                handler: ({ state, range, chain }: { state: any; range: any; chain: any }) => {
+                handler: ({ range, chain }) => {
                     chain()
                         .deleteRange(range)
                         .setObsidianComment()
                         .run();
                 },
-            },
+            }),
         ];
     },
 });
