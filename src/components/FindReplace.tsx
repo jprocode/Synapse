@@ -38,7 +38,7 @@ export default function FindReplace({ editor, isOpen, onClose }: FindReplaceProp
             // Remove highlights
             if (editor) {
                 const existingPlugin = editor.view.state.plugins.find(
-                    (p) => (p as Plugin & { key: string }).key === searchPluginKey.key
+                    (p) => (p.spec as { key?: string }).key === searchPluginKey.spec.key
                 );
                 if (existingPlugin) {
                     editor.view.dispatch(editor.view.state.tr.setMeta(searchPluginKey, { decorations: DecorationSet.empty }));

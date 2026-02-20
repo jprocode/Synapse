@@ -30,16 +30,14 @@ import Typography from '@tiptap/extension-typography';
 
 // Custom extensions
 import Callout from '../extensions/Callout';
-import ToggleList from '../extensions/ToggleList';
 import WikiLink from '../extensions/WikiLink';
 import TableOfContents from '../extensions/TableOfContents';
-import BookmarkEmbed from '../extensions/BookmarkEmbed';
-import { ColumnBlock, Column } from '../extensions/ColumnBlock';
 import MathBlock from '../extensions/MathBlock';
 import MathInline from '../extensions/MathInline';
 import InlineComment from '../extensions/InlineComment';
 import MarkdownExtraInputRules from '../extensions/MarkdownExtraInputRules';
-import BlockHandle from '../extensions/BlockHandle';
+import ObsidianComment from '../extensions/ObsidianComment';
+import { FootnoteRef, FootnoteDef } from '../extensions/Footnote';
 
 // Sub-components
 import FindReplace from './FindReplace';
@@ -158,17 +156,15 @@ export default function Editor({ noteId, noteTitle, content, saving, onSave, onC
 
             // Custom extensions
             Callout,
-            ToggleList,
             WikiLink,
             TableOfContents,
-            BookmarkEmbed,
-            ColumnBlock,
-            Column,
             MathBlock,
             MathInline,
             InlineComment,
             MarkdownExtraInputRules,
-            BlockHandle,
+            ObsidianComment,
+            FootnoteRef,
+            FootnoteDef,
 
             // Placeholder
             Placeholder.configure({
@@ -194,12 +190,7 @@ export default function Editor({ noteId, noteTitle, content, saving, onSave, onC
                     editor?.chain().focus().toggleStrike().run();
                     return true;
                 }
-                // Cmd+E → Inline code
-                if ((event.metaKey || event.ctrlKey) && event.key === 'e') {
-                    event.preventDefault();
-                    editor?.chain().focus().toggleCode().run();
-                    return true;
-                }
+                // Cmd+E is handled by App.tsx for reading mode toggle
                 // Cmd+Shift+H → Highlight
                 if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'H') {
                     event.preventDefault();
@@ -715,7 +706,7 @@ export default function Editor({ noteId, noteTitle, content, saving, onSave, onC
                             </svg>
                         </button>
                         <button
-                            onClick={() => editor?.chain().focus().setCallout({ emoji: '💡', color: 'yellow' }).run()}
+                            onClick={() => editor?.chain().focus().setCallout({ type: 'note', title: 'Note' }).run()}
                             className="toolbar-btn"
                             title="Insert Callout"
                         >
@@ -723,25 +714,6 @@ export default function Editor({ noteId, noteTitle, content, saving, onSave, onC
                                 <circle cx="12" cy="12" r="10" />
                                 <line x1="12" y1="16" x2="12" y2="12" />
                                 <line x1="12" y1="8" x2="12.01" y2="8" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={() => editor?.chain().focus().insertContent({ type: 'toggleList', content: [{ type: 'paragraph' }] }).run()}
-                            className="toolbar-btn"
-                            title="Insert Toggle"
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={() => editor?.chain().focus().setColumns(2).run()}
-                            className="toolbar-btn"
-                            title="Insert 2 Columns"
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <line x1="12" y1="3" x2="12" y2="21" />
                             </svg>
                         </button>
                         <button

@@ -1,141 +1,213 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNotes } from './hooks/useNotes';
+import { useEffect, useCallback, useState, useRef } from 'react';
+import { useVaultStore } from './stores/vaultStore';
+import VaultSetup from './components/VaultSetup';
+import FileExplorer from './components/FileExplorer';
+import BacklinksPanel from './components/BacklinksPanel';
 import Editor from './components/Editor';
-import NoteHeader from './components/NoteHeader';
-import NoteList from './components/NoteList';
-import CommandPalette from './components/CommandPalette';
 import ToastContainer, { showToast } from './components/Toast';
 
 export default function App() {
   const {
-    notes,
-    allNotes,
-    activeNote,
-    activeNoteId,
-    activeContent,
+    vaultReady,
     loading,
+    activeNotePath,
+    activeNoteContent,
+    activeNoteTitle,
     saving,
-    error,
-    searchQuery,
-    sortMode,
-    setActiveNoteId,
-    setActiveContent,
-    setSearchQuery,
-    setSortMode,
+    leftSidebarOpen,
+    rightSidebarOpen,
+    initVault,
     createNote,
     saveNote,
-    deleteNote,
-    renameNote,
-    clearError,
-  } = useNotes();
+    toggleLeftSidebar,
+    toggleRightSidebar,
+  } = useVaultStore();
 
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Show errors as toasts
+  // Initialize vault on mount
   useEffect(() => {
-    if (error) {
-      showToast(error, 'error');
-      clearError();
-    }
-  }, [error, clearError]);
+    initVault();
+  }, [initVault]);
 
-  // Global Cmd+K handler for command palette
+  // Auto-save with debounce
+  const handleContentChange = useCallback(
+    (content: string) => {
+      if (!activeNotePath) return;
+
+      // Clear previous timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Debounce save by 500ms
+      saveTimeoutRef.current = setTimeout(() => {
+        saveNote(activeNotePath, content);
+      }, 500);
+    },
+    [activeNotePath, saveNote]
+  );
+
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const meta = e.metaKey || e.ctrlKey;
+
+      // Cmd+N — new note
+      if (meta && e.key === 'n') {
         e.preventDefault();
-        setCommandPaletteOpen(prev => !prev);
+        createNote('Untitled', '').then(() => {
+          showToast('Note created', 'success');
+        });
+      }
+
+      // Cmd+E — toggle reading mode
+      if (meta && e.key === 'e') {
+        e.preventDefault();
+        setReadingMode((prev) => !prev);
+      }
+
+      // Cmd+B — toggle left sidebar
+      if (meta && e.key === 'b') {
+        e.preventDefault();
+        toggleLeftSidebar();
+      }
+
+      // Cmd+S — force save (already auto-saving, but respect the habit)
+      if (meta && e.key === 's') {
+        e.preventDefault();
+        if (activeNotePath && activeNoteContent) {
+          saveNote(activeNotePath, activeNoteContent);
+          showToast('Saved', 'success');
+        }
       }
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [createNote, toggleLeftSidebar, saveNote, activeNotePath, activeNoteContent]);
 
-  const handleNewNote = useCallback(async () => {
-    const note = await createNote('Untitled Note');
-    if (note) {
-      showToast('Note created', 'success');
-    }
-  }, [createNote]);
+  // ─── Loading state ────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="app-loading">
+        <div className="app-loading-spinner" />
+        <p>Loading Synapse...</p>
+      </div>
+    );
+  }
 
-  const handleDeleteNote = useCallback(async (id: string) => {
-    await deleteNote(id);
-    showToast('Note deleted', 'success');
-  }, [deleteNote]);
+  // ─── Vault setup (first launch) ──────────────────────────────
+  if (!vaultReady) {
+    return <VaultSetup />;
+  }
 
-  const handleRenameNote = useCallback(async (id: string, newTitle: string) => {
-    await renameNote(id, newTitle);
-    showToast('Note renamed', 'success');
-  }, [renameNote]);
-
-  const handleTitleChange = useCallback(async (title: string) => {
-    if (activeNoteId) {
-      await renameNote(activeNoteId, title);
-    }
-  }, [activeNoteId, renameNote]);
-
-  // Focus editor body (called from NoteHeader on Enter)
-  const focusEditor = useCallback(() => {
-    const editorEl = document.querySelector('.editor-content') as HTMLElement;
-    if (editorEl) editorEl.focus();
-  }, []);
-
-  // Get word/char counts from editor storage
-  const editorEl = document.querySelector('.ProseMirror');
-  const wordCount = editorEl ? (editorEl as HTMLElement).textContent?.split(/\s+/).filter(Boolean).length ?? 0 : 0;
-  const charCount = editorEl ? (editorEl as HTMLElement).textContent?.length ?? 0 : 0;
-
+  // ─── Main app layout ─────────────────────────────────────────
   return (
     <div className="app-layout">
-      <NoteList
-        notes={notes}
-        activeNoteId={activeNoteId}
-        searchQuery={searchQuery}
-        sortMode={sortMode}
-        loading={loading}
-        onSelectNote={setActiveNoteId}
-        onSearchChange={setSearchQuery}
-        onSortChange={setSortMode}
-        onNewNote={handleNewNote}
-      />
+      {/* Left sidebar: File Explorer */}
+      {leftSidebarOpen && (
+        <aside className="sidebar sidebar-left">
+          <FileExplorer />
+        </aside>
+      )}
 
+      {/* Main editor area */}
       <main className="main-area">
-        {activeNote && (
-          <NoteHeader
-            noteId={activeNoteId}
-            title={activeNote.title}
-            createdAt={activeNote.created_at}
-            modifiedAt={activeNote.modified_at}
-            wordCount={wordCount}
-            charCount={charCount}
-            onTitleChange={handleTitleChange}
-            onEditorFocus={focusEditor}
-          />
+        {activeNotePath ? (
+          <>
+            {/* Note title bar */}
+            <div className="note-topbar">
+              <div className="note-topbar-left">
+                <button
+                  className="topbar-btn"
+                  onClick={toggleLeftSidebar}
+                  title="Toggle sidebar (Cmd+B)"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.2" />
+                    <line x1="5" y1="2" x2="5" y2="14" stroke="currentColor" strokeWidth="1.2" />
+                  </svg>
+                </button>
+                <span className="note-breadcrumb">
+                  {activeNotePath.replace('.md', '')}
+                </span>
+              </div>
+              <div className="note-topbar-right">
+                <button
+                  className={`topbar-btn ${readingMode ? 'active' : ''}`}
+                  onClick={() => setReadingMode(!readingMode)}
+                  title="Toggle reading mode (Cmd+E)"
+                >
+                  {readingMode ? (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 3C4.5 3 2 8 2 8s2.5 5 6 5 6-5 6-5-2.5-5-6-5z" stroke="currentColor" strokeWidth="1.2" />
+                      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 3h4l1 1.5H13v8H3V3z" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  className={`topbar-btn ${rightSidebarOpen ? 'active' : ''}`}
+                  onClick={toggleRightSidebar}
+                  title="Toggle backlinks panel"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.2" />
+                    <line x1="11" y1="2" x2="11" y2="14" stroke="currentColor" strokeWidth="1.2" />
+                  </svg>
+                </button>
+                {saving && <span className="topbar-saving">Saving...</span>}
+              </div>
+            </div>
+
+            {/* Editor */}
+            <Editor
+              noteId={activeNotePath}
+              noteTitle={activeNoteTitle}
+              content={activeNoteContent || ''}
+              saving={saving}
+              onSave={(content: string) => {
+                if (activeNotePath) {
+                  saveNote(activeNotePath, content);
+                }
+              }}
+              onContentChange={handleContentChange}
+              onTitleChange={() => { }}
+            />
+          </>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="32" r="30" stroke="var(--text-muted)" strokeWidth="1.5" opacity="0.3" />
+                <circle cx="32" cy="32" r="6" fill="var(--text-muted)" opacity="0.3" />
+                <circle cx="32" cy="12" r="3" fill="var(--text-muted)" opacity="0.2" />
+                <circle cx="32" cy="52" r="3" fill="var(--text-muted)" opacity="0.2" />
+                <circle cx="12" cy="32" r="3" fill="var(--text-muted)" opacity="0.2" />
+                <circle cx="52" cy="32" r="3" fill="var(--text-muted)" opacity="0.2" />
+                <line x1="32" y1="26" x2="32" y2="15" stroke="var(--text-muted)" strokeWidth="1" opacity="0.15" />
+                <line x1="32" y1="49" x2="32" y2="38" stroke="var(--text-muted)" strokeWidth="1" opacity="0.15" />
+                <line x1="26" y1="32" x2="15" y2="32" stroke="var(--text-muted)" strokeWidth="1" opacity="0.15" />
+                <line x1="49" y1="32" x2="38" y2="32" stroke="var(--text-muted)" strokeWidth="1" opacity="0.15" />
+              </svg>
+            </div>
+            <h2>No note selected</h2>
+            <p>Select a note from the sidebar or create a new one with <kbd>Cmd+N</kbd></p>
+          </div>
         )}
-        <Editor
-          noteId={activeNoteId}
-          noteTitle={activeNote?.title ?? 'Untitled'}
-          content={activeContent}
-          saving={saving}
-          onSave={saveNote}
-          onContentChange={setActiveContent}
-          onTitleChange={handleTitleChange}
-        />
       </main>
 
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        notes={allNotes}
-        activeNoteId={activeNoteId}
-        onClose={() => setCommandPaletteOpen(false)}
-        onNewNote={handleNewNote}
-        onDeleteNote={handleDeleteNote}
-        onRenameNote={handleRenameNote}
-        onSelectNote={(id) => {
-          setActiveNoteId(id);
-          setCommandPaletteOpen(false);
-        }}
-      />
+      {/* Right sidebar: Backlinks, Tags, Outline */}
+      {rightSidebarOpen && (
+        <aside className="sidebar sidebar-right">
+          <BacklinksPanel />
+        </aside>
+      )}
 
       <ToastContainer />
     </div>

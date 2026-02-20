@@ -38,7 +38,7 @@ function htmlToMarkdown(html: string): string {
     return md;
 }
 
-export default function RawMarkdown({ content, isOpen, onContentChange }: RawMarkdownProps) {
+export default function RawMarkdown({ content, isOpen, onContentChange: _onContentChange }: RawMarkdownProps) {
     const [rawContent, setRawContent] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 

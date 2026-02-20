@@ -26,3 +26,11 @@ uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 dirs = "5.0"
+notify = { version = "7.0", features = ["macos_fsevent"] }
+notify-debouncer-mini = "0.5"
+walkdir = "2.5"
+serde_yaml = "0.9"
+pulldown-cmark = "0.12"
+tokio = { version = "1", features = ["full"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"

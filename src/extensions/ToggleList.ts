@@ -6,7 +6,7 @@ export interface ToggleListOptions {
 
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
-        toggleList: {
+        synapseToggleList: {
             setToggleList: () => ReturnType;
             unsetToggleList: () => ReturnType;
         };
@@ -29,8 +29,8 @@ const ToggleList = Node.create<ToggleListOptions>({
         return {
             open: {
                 default: true,
-                parseHTML: (element) => element.hasAttribute('open'),
-                renderHTML: (attributes) => {
+                parseHTML: (element: Element) => element.hasAttribute('open'),
+                renderHTML: (attributes: Record<string, unknown>) => {
                     if (!attributes.open) return {};
                     return { open: 'open' };
                 },
@@ -61,12 +61,12 @@ const ToggleList = Node.create<ToggleListOptions>({
         return {
             setToggleList:
                 () =>
-                    ({ commands }) => {
+                    ({ commands }: { commands: any }) => {
                         return commands.wrapIn(this.name);
                     },
             unsetToggleList:
                 () =>
-                    ({ commands }) => {
+                    ({ commands }: { commands: any }) => {
                         return commands.lift(this.name);
                     },
         };
@@ -76,7 +76,6 @@ const ToggleList = Node.create<ToggleListOptions>({
         return {
             'Mod-Enter': ({ editor }) => {
                 if (!editor.isActive(this.name)) return false;
-                // Toggle open/close
                 const { state, dispatch } = editor.view;
                 const { $from } = state.selection;
                 for (let d = $from.depth; d >= 0; d--) {

@@ -1,4 +1,4 @@
-import { Mark, mergeAttributes, InputRule } from '@tiptap/core';
+import { Mark, mergeAttributes } from '@tiptap/core';
 
 export interface InlineCommentOptions {
     HTMLAttributes: Record<string, unknown>;
